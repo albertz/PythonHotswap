@@ -1,6 +1,8 @@
 
 
 import dis
+import types
+
 
 def _modify_abs_jumps(codestr, start, end, jumprel):
 	i = start
@@ -28,6 +30,18 @@ def _join_codestr(codestr1, codestr2):
 	codestr = codestr1 + codestr2
 	_modify_abs_jumps(codestr, start=len(codestr1), end=len(codestr), jumprel=len(codestr1))
 	return codestr
+
+def _modify_code(c, codestr):
+
+	CodeArgs = [
+		"argcount", "nlocals", "stacksize", "flags", "code",
+		"consts", "names", "varnames", "filename", "name",
+		"firstlineno", "lnotab", "freevars", "cellvars"]
+	c_dict = dict([(arg, getattr(c, "co_" + arg)) for arg in CodeArgs])
+	c_dict["code"] = codestr
+
+	c = types.CodeType(*[c_dict[arg] for arg in CodeArgs])
+	return c
 
 def restart_func(func, codeline, localdict):
 

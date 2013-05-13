@@ -24,6 +24,7 @@ def _modify_abs_jumps(codestr, start, end, jumprel):
 			codestr[i-1] = chr(num >> 8)
 
 def _join_codestr(codestr1, codestr2):
+	# see dis.findlinestarts() about co_firstlineno and co_lnotab
 	codestr = codestr1 + codestr2
 	_modify_abs_jumps(codestr, start=len(codestr1), end=len(codestr), jumprel=len(codestr1))
 	return codestr

@@ -25,8 +25,15 @@ def _modify_abs_jumps(codestr, start, end, jumprel):
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
 
-def _join_codestr(codestr1, codestr2):
+def _codestr_without_final_return(codestr):
+	assert len(codestr) >= 4
+	assert codestr[-4] == dis.opmap["LOAD_CONST"]
+	assert codestr[-1] == dis.opmap["RETURN_VALUE"]
+	return codestr[:-4]
+
+def _join_codestr(codestr1, codestr2, firstlineno2, lnotab2):
 	# see dis.findlinestarts() about co_firstlineno and co_lnotab
+	codestr1 = _codestr_without_final_return(codestr1)
 	codestr = codestr1 + codestr2
 	_modify_abs_jumps(codestr, start=len(codestr1), end=len(codestr), jumprel=len(codestr1))
 	return codestr
@@ -43,8 +50,22 @@ def _modify_code(c, codestr):
 	c = types.CodeType(*[c_dict[arg] for arg in CodeArgs])
 	return c
 
-def restart_func(func, codeline, localdict):
+def _merge_locals(localdict):
+	#locals().update(localdict)
+	a = 42
 
+def restart_func(func, instraddr, localdict):
+	preload_code = ""
+	code_consts = func.func_code.co_consts
+	LOAD_CONST = chr(dis.opmap["LOAD_CONST"])
+	for key,value in localdict.items():
+		co_const_idx = len(code_consts)
+		code_consts += (value,)
+		preload_code += LOAD_CONST
+		preload_code += chr(co_const_idx & 255) + chr(co_const_idx >> 8)
+	instraddr += len(preload_code) + 3 # 3 for the following jump_abs
+	preload_code += chr(dis.opmap["JUMP_ABSOLUTE"])
+	
 	end = len(func.func_code.co_code)
 	i = 0
 	while i < end:
@@ -85,7 +106,8 @@ def demo():
 		import sys
 		_,_,tb = sys.exc_info()
 		tb = _find_traceframe(tb, demoFunc.func_code)
-		print "locals:", tb.tb_frame.f_locals
-		print "lineno:", tb.tb_lineno
+		localdict = tb.tb_frame.f_locals
+		lineno = tb.tb_lineno #, tb.tb_frame.f_lineno
+		instaddr = tb.tb_lasti # tb.tb_frame.f_lasti
 
-
+	localdict["b"] = 2

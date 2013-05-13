@@ -64,3 +64,28 @@ def restart_func(func, codeline, localdict):
 		if op in dis.hasjabs:
 			print dis.opname[op] + " to " + repr(num)
 
+def demoFunc(a,b,c, raiseExc=None):
+	print("a: %r" % a)
+	while b:
+		print("b: %r" % b)
+		if b == 3 and raiseExc: raise raiseExc
+		b -= 1
+	print("c: %r" % c)
+
+def _find_traceframe(tb, code):
+	while tb:
+		if tb.tb_frame.f_code is code: return tb
+		tb = tb.tb_next
+	return None
+
+def demo():
+	try:
+		demoFunc(5,4,1, Exception)
+	except Exception:
+		import sys
+		_,_,tb = sys.exc_info()
+		tb = _find_traceframe(tb, demoFunc.func_code)
+		print "locals:", tb.tb_frame.f_locals
+		print "lineno:", tb.tb_lineno
+
+

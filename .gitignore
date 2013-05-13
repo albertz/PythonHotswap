@@ -1,1 +1,4 @@
 .*.swp
+
+# PyCharm project files:
+.idea

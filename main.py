@@ -126,27 +126,35 @@ def restart_func(func, instraddr, localdict):
 	)
 	return new_func
 
-def demoFunc(a,b,c, raiseExc=None):
-	print("a: %r" % a)
-	while b:
-		print("b: %r" % b)
-		if b == 4 and raiseExc: raise raiseExc
-		if b == 2: continue
-		b -= 1
-	print("c: %r" % c)
-
 def _find_traceframe(tb, code):
 	while tb:
 		if tb.tb_frame.f_code is code: return tb
 		tb = tb.tb_next
 	return None
 
-def demo():
+
+def demo1():
+	def demoFunc(a,b,c, raiseExc=None):
+		print("a: %r" % a)
+		while b > 0:
+			print("b: %r" % b)
+			if b == 4 and raiseExc: raise raiseExc
+			if b == 2:
+				b = 0
+				continue
+			b -= 1
+		print("c: %r" % c)
+
 	func = demoFunc
 	try:
-		demoFunc(5,4,1, Exception)
+		# This prints:
+		#   a: 'start'
+		#   b: 5
+		# And throws the exception then.
+		demoFunc("start", 5, "end", Exception)
 		assert False
 	except Exception:
+		print "! Exception"
 		import sys
 		_,_,tb = sys.exc_info()
 
@@ -155,11 +163,20 @@ def demo():
 	localdict = tb.tb_frame.f_locals
 	instraddr = tb.tb_lasti
 
+	# Start just one after the `raise`.
 	instraddr += 3 if ord(func.func_code.co_code[instraddr]) >= dis.HAVE_ARGUMENT else 1
-	localdict["b"] = 2
+	# Play around. Avoid that we throw the exception again.
+	localdict["b"] = 5
+	localdict["raiseExc"] = None
 	new_func = restart_func(func, instraddr=instraddr, localdict=localdict)
 
-	return new_func
+	# This prints:
+	#   b: 4
+	#   b: 3
+	#   b: 2
+	#   c: 'end'
+	new_func()
+
 
 if __name__ == "__main__":
 	f = demo()

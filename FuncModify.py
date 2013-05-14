@@ -55,10 +55,9 @@ def _modified_code(c, **kwargs):
 	c = types.CodeType(*[c_dict[arg] for arg in CodeArgs])
 	return c
 
-def _find_setup_blocks(codestr):
+def _find_setup_blocks(codestr, start, end):
 	"Yields (op, absolute target instraddr)"
-	end = len(codestr)
-	i = 0
+	i = start
 	SETUPS = [dis.opmap[opname] for opname in ["SETUP_LOOP", "SETUP_EXCEPT", "SETUP_FINALLY"]]
 	while i < end:
 		op = ord(codestr[i])
@@ -89,7 +88,7 @@ def restart_func(func, instraddr, localdict):
 		varidx = func.func_code.co_varnames.index(key)
 		preload_code += STORE_FAST + chr(varidx & 255) + chr(varidx >> 8)
 
-	setup_blocks = list(_find_setup_blocks(func.func_code.co_code))
+	setup_blocks = list(_find_setup_blocks(func.func_code.co_code, start=0, end=instraddr))
 	preload_code_len = len(localdict) * 6 + len(setup_blocks) * 3 + 3
 	for op,targetaddr in setup_blocks:
 		targetaddr += preload_code_len

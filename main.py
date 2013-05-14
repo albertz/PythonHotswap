@@ -54,6 +54,28 @@ def _modified_code(c, **kwargs):
 	c = types.CodeType(*[c_dict[arg] for arg in CodeArgs])
 	return c
 
+def _find_setup_blocks(codestr):
+	"Yields (op, absolute target instraddr)"
+	end = len(codestr)
+	i = 0
+	SETUPS = [dis.opmap[opname] for opname in ["SETUP_LOOP", "SETUP_EXCEPT", "SETUP_FINALLY"]]
+	while i < end:
+		op = ord(codestr[i])
+		i += 1
+
+		if op >= dis.HAVE_ARGUMENT:
+			b1 = ord(codestr[i])
+			b2 = ord(codestr[i+1])
+			num = b2 * 256 + b1
+			del b1,b2
+			i += 2
+		else:
+			num = 0
+
+		if op in SETUPS:
+			assert op >= dis.HAVE_ARGUMENT
+			yield (op, i + num)
+
 def restart_func(func, instraddr, localdict):
 	preload_code = ""
 	code_consts = func.func_code.co_consts
@@ -65,9 +87,20 @@ def restart_func(func, instraddr, localdict):
 		preload_code += LOAD_CONST + chr(co_const_idx & 255) + chr(co_const_idx >> 8)
 		varidx = func.func_code.co_varnames.index(key)
 		preload_code += STORE_FAST + chr(varidx & 255) + chr(varidx >> 8)
-	instraddr += len(preload_code) + 3 # 3 for the following jump_abs
+
+	setup_blocks = list(_find_setup_blocks(func.func_code.co_code))
+	preload_code_len = len(localdict) * 6 + len(setup_blocks) * 3 + 3
+	for op,targetaddr in setup_blocks:
+		targetaddr += preload_code_len
+		reladdr = targetaddr - (len(preload_code) + 3)
+		preload_code += chr(op) + chr(reladdr & 255) + chr(reladdr >> 8)
+
+	instraddr += preload_code_len
 	preload_code += chr(dis.opmap["JUMP_ABSOLUTE"])
 	preload_code += chr(instraddr & 255) + chr(instraddr >> 8)
+
+	# Just a check. LoadConst+StoreFast, then .. and then JumpAbs.
+	assert preload_code_len == len(preload_code)
 
 	codestr = _prefix_codestr(preload_code, func.func_code.co_code)
 
@@ -97,7 +130,8 @@ def demoFunc(a,b,c, raiseExc=None):
 	print("a: %r" % a)
 	while b:
 		print("b: %r" % b)
-		if b == 3 and raiseExc: raise raiseExc
+		if b == 4 and raiseExc: raise raiseExc
+		if b == 2: continue
 		b -= 1
 	print("c: %r" % c)
 
@@ -119,8 +153,7 @@ def demo():
 	tb = _find_traceframe(tb, func.func_code)
 	assert tb is not None
 	localdict = tb.tb_frame.f_locals
-	lineno = tb.tb_lineno #, tb.tb_frame.f_lineno
-	instraddr = tb.tb_lasti # tb.tb_frame.f_lasti
+	instraddr = tb.tb_lasti
 
 	instraddr += 3 if ord(func.func_code.co_code[instraddr]) >= dis.HAVE_ARGUMENT else 1
 	localdict["b"] = 2

@@ -74,7 +74,7 @@ def _find_setup_blocks(codestr):
 			assert op >= dis.HAVE_ARGUMENT
 			yield (op, i + num)
 
-def restart_func(func, instraddr, localdict):
+def restart_func(func, instraddr, localdict={}):
 	preload_code = ""
 	code_consts = func.func_code.co_consts
 	LOAD_CONST = chr(dis.opmap["LOAD_CONST"])

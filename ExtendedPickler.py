@@ -1,4 +1,5 @@
-# Code by Albert Zeyer.
+# Copyright (c) 2013, Albert Zeyer, www.az2000.de
+# All rights reserved.
 # Code under 2-clause BSD licence.
 
 import pickle, types, marshal, sys

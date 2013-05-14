@@ -62,8 +62,6 @@ def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 	import re
 	r = re.compile(r"^@@ -([0-9]+).*@@.*$")
 	for diffline in diffout:
-		if lineno >= oldlineno:
-			return newlineno
 		if diffline.startswith("--- "): continue
 		if diffline.startswith("+++ "): continue
 		m = r.match(diffline)
@@ -79,6 +77,8 @@ def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 			newlineno += 1
 		elif diffline[0] == "-":
 			lineno += 1
+		if lineno >= oldlineno:
+			return newlineno
 	return newlineno
 
 def demo2():
@@ -120,11 +120,12 @@ def demo2():
 		tb = excinfo[-1]
 	tb = _find_traceframe(tb, func.func_code)
 	assert tb is not None
+	localdict = dict(tb.tb_frame.f_locals)
 
 	# Write hint about exception.
 	lines = list(open(tmpfn).readlines())
 	lineno = tb.tb_lineno - 1
-	lines[lineno:lineno] = ["# The exception was raised in the line below!"]
+	lines[lineno:lineno] = ["# The exception was raised in the following line!\n"]
 	open(tmpfn, "w").writelines(lines)
 
 	# Let the user edit the file again.
@@ -137,11 +138,16 @@ def demo2():
 	newlineno = _calc_newlineno_via_diff(tb.tb_lineno + 1, tmpbackupfn, tmpfn)
 	print "Starting in line %i at %r" % (newlineno, open(tmpfn).readlines()[newlineno].strip("\n"))
 	# Use that instruction address.
-	instraddr = min([addr for (addr,lineno) in dis.findlinestarts(func.func_code) if lineno == newlineno])
+	instraddr = min([addr for (addr,lineno) in dis.findlinestarts(func.func_code) if lineno >= newlineno])
+
+	# Register some cleanup handlers.
+	import atexit
+	atexit.register(lambda: os.remove(tmpfn))
+	atexit.register(lambda: os.remove(tmpbackupfn))
 
 	# Now, do the magic!
 	# Create a modified function which jumps right to the previous place.
-	newfunc = restart_func(func, instraddr=instraddr)
+	newfunc = restart_func(func, instraddr=instraddr, localdict=localdict)
 	# And run it.
 	newfunc()
 

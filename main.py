@@ -152,6 +152,9 @@ def demo2():
 	# And run it.
 	newfunc()
 
+	# Note that we could have also pickled the localdict to disk and restart
+	# the updated function later on in a new Python instance.
+
 
 if __name__ == "__main__":
 	import sys

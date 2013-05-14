@@ -70,7 +70,6 @@ def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 		m = r.match(diffline)
 		if m:
 			nextlineno = int(m.groups()[0])
-			nextlineno += 1 # diff lineno's start at 0
 			if nextlineno > oldlineno:
 				return newlineno + (oldlineno - lineno)
 			newlineno += (nextlineno - lineno)
@@ -81,9 +80,9 @@ def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 			newlineno += 1
 		elif diffline[0] == "-":
 			lineno += 1
-		if lineno >= oldlineno:
+		if lineno > oldlineno:
 			return newlineno
-	return newlineno
+	return newlineno + (oldlineno - lineno)
 
 def demo2():
 	# Let the user create some Python code.
@@ -129,7 +128,10 @@ def demo2():
 	# Write hint about exception.
 	lines = list(open(tmpfn).readlines())
 	lineno = tb.tb_lineno - 1
-	lines[lineno:lineno] = ["# The exception was raised in the following line!\n"]
+	lines[lineno:lineno] = [
+		"# The exception was raised in the following line!\n",
+		"# Now modify it as you wish. :)\n"
+	]
 	open(tmpfn, "w").writelines(lines)
 
 	# Let the user edit the file again.

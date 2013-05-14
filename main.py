@@ -35,12 +35,11 @@ def demo1():
 
 	tb = _find_traceframe(tb, func.func_code)
 	assert tb is not None
-	localdict = tb.tb_frame.f_locals
-	instraddr = tb.tb_lasti
 
 	# Start just one after the `raise`.
-	instraddr += 3 if ord(func.func_code.co_code[instraddr]) >= dis.HAVE_ARGUMENT else 1
+	instraddr = min([addr for (addr,_) in dis.findlinestarts(func.func_code) if addr > tb.tb_lasti])
 	# Play around. Avoid that we throw the exception again.
+	localdict = dict(tb.tb_frame.f_locals)
 	localdict["b"] = 5
 	localdict["raiseExc"] = None
 	new_func = restart_func(func, instraddr=instraddr, localdict=localdict)

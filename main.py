@@ -67,6 +67,7 @@ def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 		m = r.match(diffline)
 		if m:
 			nextlineno = int(m.groups()[0])
+			nextlineno += 1 # diff lineno's start at 0
 			if nextlineno > oldlineno:
 				return newlineno + (oldlineno - lineno)
 			newlineno += (nextlineno - lineno)
@@ -135,8 +136,8 @@ def demo2():
 	tmpfnmod = imp.load_source("tmpfnmod", tmpfn)
 	func = tmpfnmod.main
 	# Calculate new line number.
-	newlineno = _calc_newlineno_via_diff(tb.tb_lineno + 1, tmpbackupfn, tmpfn)
-	print "Starting in line %i at %r" % (newlineno, open(tmpfn).readlines()[newlineno].strip("\n"))
+	newlineno = _calc_newlineno_via_diff(tb.tb_lineno, tmpbackupfn, tmpfn)
+	print "Restarting in line %i at %r" % (newlineno, open(tmpfn).readlines()[newlineno-1].strip())
 	# Use that instruction address.
 	instraddr = min([addr for (addr,lineno) in dis.findlinestarts(func.func_code) if lineno >= newlineno])
 

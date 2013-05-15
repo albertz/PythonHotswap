@@ -90,6 +90,17 @@ def _find_setup_blocks(codestr, start, end):
 	return blockstack
 
 def restart_func(func, instraddr, localdict):
+	"""
+	Returns a new modified version of `func` which jumps right to instraddr
+	with the localdict in place.
+
+	Note that the way this currently works is limited because it uses
+	only standard Python functions and objects. Only while-loops are supported.
+
+	For-loops are not supported and are not possible this way.
+	Except-blocks and with-blocks are not tested and will probably crash.
+	"""
+
 	preload_code = ""
 	code_consts = func.func_code.co_consts
 	LOAD_CONST = chr(dis.opmap["LOAD_CONST"])

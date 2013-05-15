@@ -164,13 +164,16 @@ def demo2():
 def demo3():
 	def func():
 		bug = True
-		for i in range(3):
-			print i
-		for i in range(3):
-			print i
+		i = 0
+		while i < 3:
+			print "a:", i
+			i += 1
+		i = 0
+		while i < 3:
+			print "b:", i
 			if bug: raise Exception
+			i += 1
 
-	dis.dis(func)
 	try:
 		func()
 		assert False
@@ -188,7 +191,6 @@ def demo3():
 	localdict["bug"] = False
 	new_func = restart_func(func, instraddr=instraddr, localdict=localdict)
 
-	dis.dis(new_func)
 	new_func()
 
 

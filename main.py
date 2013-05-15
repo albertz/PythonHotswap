@@ -2,6 +2,7 @@
 # All rights reserved.
 # Code under 2-clause BSD licence.
 
+import sys
 import dis
 from FuncModify import restart_func
 
@@ -34,7 +35,6 @@ def demo1():
 		assert False
 	except Exception:
 		print "! Exception"
-		import sys
 		_,_,tb = sys.exc_info()
 
 	tb = _find_traceframe(tb, func.func_code)
@@ -161,8 +161,38 @@ def demo2():
 	# the updated function later on in a new Python instance.
 
 
+def demo3():
+	def func():
+		bug = True
+		for i in range(3):
+			print i
+		for i in range(3):
+			print i
+			if bug: raise Exception
+
+	dis.dis(func)
+
+	try:
+		func()
+		assert False
+	except Exception:
+		print "! Exception"
+		_,_,tb = sys.exc_info()
+
+	tb = _find_traceframe(tb, func.func_code)
+	assert tb is not None
+
+	# Start just at where the exception was raised.
+	instraddr = max([addr for (addr,_) in dis.findlinestarts(func.func_code) if addr <= tb.tb_lasti])
+	# Play around. Avoid that we throw the exception again.
+	localdict = dict(tb.tb_frame.f_locals)
+	localdict["bug"] = False
+	new_func = restart_func(func, instraddr=instraddr, localdict=localdict)
+
+	new_func()
+
+
 if __name__ == "__main__":
-	import sys
 	demoname = "demo1"
 	if len(sys.argv) > 0: demoname = sys.argv[1]
 	globals()[demoname]()

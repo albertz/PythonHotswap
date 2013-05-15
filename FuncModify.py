@@ -109,6 +109,13 @@ def restart_func(func, instraddr, localdict):
 	# And if you want to resume somewhere else, you again need to manually
 	# recalculate the stack so that it stays same.
 
+	# And yet another:
+	# We could also return a modified version of the func which automatically
+	# replaces all for-loops with while-loops and store the iterator object
+	# in a temporary local variable. However, still left is the problem that
+	# many iterator objects (e.g. listiterator) are not pickable, so
+	# serializing doesn't work. This again could be hacked via ctypes.
+
 	preload_code = ""
 	code_consts = func.func_code.co_consts
 	LOAD_CONST = chr(dis.opmap["LOAD_CONST"])

@@ -171,7 +171,6 @@ def demo3():
 			if bug: raise Exception
 
 	dis.dis(func)
-
 	try:
 		func()
 		assert False
@@ -189,6 +188,7 @@ def demo3():
 	localdict["bug"] = False
 	new_func = restart_func(func, instraddr=instraddr, localdict=localdict)
 
+	dis.dis(new_func)
 	new_func()
 
 

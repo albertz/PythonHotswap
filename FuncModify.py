@@ -59,6 +59,8 @@ def _find_setup_blocks(codestr, start, end):
 	"Yields (op, absolute target instraddr)"
 	i = start
 	SETUPS = [dis.opmap[opname] for opname in ["SETUP_LOOP", "SETUP_EXCEPT", "SETUP_FINALLY"]]
+	POP_BLOCK = dis.opmap["POP_BLOCK"]
+	blockstack = []
 	while i < end:
 		op = ord(codestr[i])
 		i += 1
@@ -74,7 +76,13 @@ def _find_setup_blocks(codestr, start, end):
 
 		if op in SETUPS:
 			assert op >= dis.HAVE_ARGUMENT
-			yield (op, i + num)
+			blockstack += [(op, i + num)]
+
+		elif op == POP_BLOCK:
+			assert len(blockstack) > 0
+			blockstack.pop(len(blockstack) - 1)
+
+	return blockstack
 
 def restart_func(func, instraddr, localdict):
 	preload_code = ""
@@ -88,7 +96,7 @@ def restart_func(func, instraddr, localdict):
 		varidx = func.func_code.co_varnames.index(key)
 		preload_code += STORE_FAST + chr(varidx & 255) + chr(varidx >> 8)
 
-	setup_blocks = list(_find_setup_blocks(func.func_code.co_code, start=0, end=instraddr))
+	setup_blocks = _find_setup_blocks(func.func_code.co_code, start=0, end=instraddr)
 	preload_code_len = len(localdict) * 6 + len(setup_blocks) * 3 + 3
 	for op,targetaddr in setup_blocks:
 		targetaddr += preload_code_len

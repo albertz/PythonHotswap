@@ -56,10 +56,11 @@ def _modified_code(c, **kwargs):
 	return c
 
 def _find_setup_blocks(codestr, start, end):
-	"Yields (op, absolute target instraddr)"
+	"Yields (op, absolute target instraddr, loop-type)"
 	i = start
 	SETUPS = [dis.opmap[opname] for opname in ["SETUP_LOOP", "SETUP_EXCEPT", "SETUP_FINALLY"]]
 	POP_BLOCK = dis.opmap["POP_BLOCK"]
+	FOR_ITER = dis.opmap["FOR_ITER"]
 	blockstack = []
 	while i < end:
 		op = ord(codestr[i])
@@ -76,7 +77,11 @@ def _find_setup_blocks(codestr, start, end):
 
 		if op in SETUPS:
 			assert op >= dis.HAVE_ARGUMENT
-			blockstack += [(op, i + num)]
+			blockstack += [[op, i + num, None]]
+
+		elif op == FOR_ITER:
+			assert len(blockstack) > 0
+			blockstack[-1][2] = op
 
 		elif op == POP_BLOCK:
 			assert len(blockstack) > 0
@@ -98,7 +103,19 @@ def restart_func(func, instraddr, localdict):
 
 	setup_blocks = _find_setup_blocks(func.func_code.co_code, start=0, end=instraddr)
 	preload_code_len = len(localdict) * 6 + len(setup_blocks) * 3 + 3
-	for op,targetaddr in setup_blocks:
+	for op,targetaddr,looptype in setup_blocks:
+		# Note on the loop-type:
+		# Supporting for-loops is really complicated! We need to examine the stack of
+		# the frame to get the iterator object. This cannot be done with the
+		# normal Python APIs - we need ctypes to get raw access to PyFrameObject.
+		# Then, even more complicated is to get the right stack address. You
+		# have to go back from the opaddr where you are to the last FOR_ITER and count
+		# the stack modifications.
+		# Then, if you raise an exception and catch it outside, you already have lost
+		# the stack and thus the iterator object - so this is not an option.
+		# You need to do this while it is still active - e.g. from within an
+		# exception trace function.
+		assert looptype is None, "only while-loops supported at the moment"
 		targetaddr += preload_code_len
 		reladdr = targetaddr - (len(preload_code) + 3)
 		preload_code += chr(op) + chr(reladdr & 255) + chr(reladdr >> 8)

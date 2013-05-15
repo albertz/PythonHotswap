@@ -176,3 +176,53 @@ def restart_func(func, instraddr, localdict):
 		func.func_closure,
 	)
 	return new_func
+
+def simplify_loops(func):
+	"""
+	Returns a new modified version of `func` which behaves exactly the same but
+	which has all for-loops replaced with while-loops. This makes it compatible
+	for `restart_func`.
+	"""
+
+	codestr = list(map(ord, func.func_code.co_code))
+	opaddrmap = dict(zip(range(len(codestr)), range(len(codestr))))
+
+	# TODO: search for FOR_ITER, etc...
+
+	# TODO: fix up lnotab.
+	lnotab = ""
+
+	# Fix up the absolute jumps.
+	i = 0
+	while i < len(codestr):
+		op = codestr[i]
+		i += 1
+
+		if op >= dis.HAVE_ARGUMENT:
+			b1 = codestr[i]
+			b2 = codestr[i+1]
+			num = b2 * 256 + b1
+			del b1,b2
+			i += 2
+		else:
+			num = 0
+
+		if op in dis.hasjabs:
+			assert op >= dis.HAVE_ARGUMENT
+			num = opaddrmap[num]
+			codestr[i-2] = chr(num & 255)
+			codestr[i-1] = chr(num >> 8)
+
+	new_code = _modified_code(
+		func.func_code,
+		code="".join(map(chr, codestr)),
+		lnotab=lnotab,
+	)
+	new_func = types.FunctionType(
+		new_code,
+		func.func_globals,
+		func.func_name,
+		func.func_defaults,
+		func.func_closure,
+	)
+	return new_func

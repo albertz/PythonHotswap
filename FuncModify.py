@@ -101,6 +101,14 @@ def restart_func(func, instraddr, localdict):
 	Except-blocks and with-blocks are not tested and will probably crash.
 	"""
 
+	# Another possibility to do this:
+	# We need ctypes. Then we just save the full stack and the current op.
+	# We can just load the full stack via LOAD_CONST.
+	# This again has some problems such as that we don't want to resume
+	# right at the op (because that might be the one raising an exception).
+	# And if you want to resume somewhere else, you again need to manually
+	# recalculate the stack so that it stays same.
+
 	preload_code = ""
 	code_consts = func.func_code.co_consts
 	LOAD_CONST = chr(dis.opmap["LOAD_CONST"])

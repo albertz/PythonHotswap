@@ -198,9 +198,7 @@ def demo4():
 	def func():
 		bug = True
 		for i in range(2):
-			print "a:", i
-		for i in range(2):
-			print "b:", i
+			print i
 			if bug: raise Exception
 
 	dis.dis(func)

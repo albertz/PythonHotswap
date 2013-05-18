@@ -89,6 +89,94 @@ def _find_setup_blocks(codestr, start, end):
 
 	return blockstack
 
+
+def replace_code(codeobj, instaddr, removelen, addcodestr):
+	assert isinstance(codeobj, types.CodeType)
+	lnotab = codeobj.co_lnotab
+	assert len(lnotab) % 2 == 0
+
+	# Search right place in lnotab.
+	lnotab_instaddr = 0
+	lnotab_idx = 0
+	lnotab_len = len(lnotab)
+	while lnotab_idx < lnotab_len:
+		if lnotab_instaddr >= instaddr: break
+		addrincr, lineincr = map(ord, lnotab[lnotab_idx:lnotab_idx+2])
+		lnotab_instaddr += addrincr
+		lnotab_idx += 2
+	assert lnotab_instaddr >= instaddr, "instaddr %i not in lnotab" % instaddr
+
+	# If we skipped it, insert a dummy entry to lnotab.
+	if lnotab_instaddr > instaddr:
+		# Insert. addrincr, lineincr are from the last entry.
+		lnotab = \
+			lnotab[:lnotab_idx-2] + \
+			chr(addrincr - (lnotab_instaddr - instaddr)) + chr(0) + \
+			chr(lnotab_instaddr - instaddr) + chr(lineincr) + \
+			lnotab[lnotab_idx:]
+		lnotab_idx -= 2
+		lnotab_instaddr = instaddr
+	del addrincr, lineincr
+	assert lnotab_instaddr == instaddr
+	# And lnotab_idx is right where the upcoming lnotab-data starts.
+
+	# Check whether instaddr is sane.
+	codestr = codeobj.co_code
+	codeidx = 0
+	codelen = len(codestr)
+	while codeidx < codelen:
+		if codeidx >= instaddr: break
+		op = ord(codestr[codeidx])
+		codeidx += 1
+		if op >= dis.HAVE_ARGUMENT: codeidx += 2
+	assert codeidx == instaddr, "instaddr %i doesn't align in code" % instaddr
+
+	# Check whether removelen is sane.
+	while codeidx < codelen:
+		if codeidx >= instaddr + removelen: break
+		op = ord(codestr[codeidx])
+		codeidx += 1
+		if op >= dis.HAVE_ARGUMENT: codeidx += 2
+	assert codeidx == instaddr + removelen, "removelen %i doesn't align in code" % removelen
+
+	# Update lnotab for removed code.
+	codelendiff = -removelen
+	while codelendiff < 0:
+		pass
+
+	# Update lnotab for new code.
+	codelendiff = len(addcodestr)
+	while codelendiff > 0:
+		lnotab = \
+			lnotab[:lnotab_idx] + \
+			chr(codelendiff & 255) + chr(0) + \
+			lnotab[lnotab_idx:]
+		codelendiff -= codelendiff & 255
+
+	# Check whether addcodestr is sane.
+	codeidx = 0
+	codelen = len(addcodestr)
+	while codeidx < codelen:
+		op = ord(codestr[codeidx])
+		codeidx += 1
+		if op >= dis.HAVE_ARGUMENT: codeidx += 2
+	assert codeidx == codelen, "addcodestr is not sane"
+
+	# Update codestr.
+	codestr = \
+		codestr[:instaddr] + \
+		addcodestr + \
+		codestr[instaddr+removelen:]
+
+	# Return new code object.
+	new_code = _modified_code(
+		codeobj,
+		code=codestr,
+		lnotab=lnotab,
+	)
+	return new_code
+
+
 def restart_func(func, instraddr, localdict):
 	"""
 	Returns a new modified version of `func` which jumps right to instraddr
@@ -176,6 +264,7 @@ def restart_func(func, instraddr, localdict):
 		func.func_closure,
 	)
 	return new_func
+
 
 def simplify_loops(func):
 	"""

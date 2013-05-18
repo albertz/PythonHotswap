@@ -190,7 +190,7 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 
 	# Update absolute jumps in code start.
 	def codestr_jumpaddrmap(n):
-		if n < instaddr: return n
+		if n <= instaddr: return n
 		if n >= instaddr + removelen: return n - removelen
 		assert False, "invalid jump %i in code" % n
 	codestr_start = _modified_abs_jumps(

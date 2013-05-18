@@ -30,7 +30,7 @@ def _modified_abs_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end
 
 		if op in dis.hasjabs:
 			assert op >= dis.HAVE_ARGUMENT
-			num = jumpaddrmap(jumprel)
+			num = jumpaddrmap(num)
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
 
@@ -183,10 +183,10 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 	codeidx = 0
 	codelen = len(addcodestr)
 	while codeidx < codelen:
-		op = ord(codestr[codeidx])
+		op = ord(addcodestr[codeidx])
 		codeidx += 1
 		if op >= dis.HAVE_ARGUMENT: codeidx += 2
-	assert codeidx == codelen, "addcodestr is not sane"
+	assert codeidx == codelen, "addcodestr is not sane. %r" % ((codeidx, codelen),)
 
 	# Update absolute jumps in code start.
 	def codestr_jumpaddrmap(n):
@@ -306,7 +306,7 @@ def restart_func(func, instraddr, localdict):
 def _get_varnameprefix_startidx(varnames, varnameprefix, start=1, incr=1):
 	varnameprefix += "_"
 	relidx = len(varnameprefix)
-	varnames = [name[relidx:] for name in varnames if name.startswith()]
+	varnames = [name[relidx:] for name in varnames if name.startswith(varnameprefix)]
 	def map_postfix(s):
 		try: return int(s)
 		except ValueError: return -1
@@ -339,7 +339,8 @@ def _opiter(codestr):
 def _codeops_compile(codeops):
 	codestr = ""
 	for opname,arg in codeops:
-		codestr += chr(dis.opmap[opname])
+		op = dis.opmap[opname]
+		codestr += chr(op)
 		if op >= dis.HAVE_ARGUMENT:
 			assert arg is not None
 			assert arg >= 0 and arg < 256 * 256
@@ -353,7 +354,7 @@ def _list_getobjoradd(consts, obj):
 	for i in range(len(consts)):
 		if consts[i] is obj:
 			return consts, i
-	return consts + [obj], len(consts)
+	return consts + (obj,), len(consts)
 
 def simplify_loops(func):
 	"""
@@ -362,11 +363,11 @@ def simplify_loops(func):
 	for `restart_func`.
 	"""
 
-	names = list(func.func_code.co_names)
+	names = func.func_code.co_names
 	names, names_next_idx = _list_getobjoradd(names, "next")
 	names, names_StopIter_idx = _list_getobjoradd(names, "StopIteration")
 
-	varnames = list(func.func_code.co_varnames)
+	varnames = func.func_code.co_varnames
 	varidx = _get_varnameprefix_startidx(varnames, "__loopiter")
 
 	codeobj = func.func_code
@@ -387,7 +388,7 @@ def simplify_loops(func):
 
 			# First, store the FOR_ITER iterator in a local variable.
 			varnameidx = len(varnames)
-			varnames += ["__loopiter_%i" % varidx]
+			varnames += ("__loopiter_%i" % varidx,)
 			varidx += 1
 			codeops = [("STORE_FAST", varnameidx)]
 

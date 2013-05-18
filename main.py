@@ -4,7 +4,7 @@
 
 import sys
 import dis
-from FuncModify import restart_func
+from FuncModify import restart_func, simplify_loops
 
 def _find_traceframe(tb, code):
 	while tb:
@@ -204,7 +204,12 @@ def demo4():
 			if bug: raise Exception
 
 	dis.dis(func)
-	return func
+
+	print "simplify_loops:"
+	func = simplify_loops(func)
+	dis.dis(func)
+
+	return
 
 	try:
 		func()

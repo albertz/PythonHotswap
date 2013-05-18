@@ -190,16 +190,17 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 
 	# Update absolute jumps in code start.
 	def codestr_jumpaddrmap(n):
-		if n < instaddr: return n
+		if n <= instaddr: return n
 		if n >= instaddr + removelen: return n - removelen
-		assert False, "invalid jump %i in start code" % n
+		assert False, "invalid jump %i in code" % n
 	codestr_start = _modified_abs_jumps(
 		codestr[:instaddr],
 		jumpaddrmap=codestr_jumpaddrmap)
 
 	# Update absolute jumps in code middle.
 	def addcodestr_jumpaddrmap(n):
-		if n < len(addcodestr): return n + instaddr
+		if n <= instaddr: return n
+		if n >= instaddr + removelen: return n - removelen
 		assert False, "invalid jump %i in addcodestr"
 	codestr_middle = _modified_abs_jumps(
 		addcodestr,
@@ -311,6 +312,58 @@ def restart_func(func, instraddr, localdict):
 	return new_func
 
 
+def _get_varnameprefix_startidx(varnames, varnameprefix, start=1, incr=1):
+	varnameprefix += "_"
+	relidx = len(varnameprefix)
+	varnames = [name[relidx:] for name in varnames if name.startswith()]
+	def map_postfix(s):
+		try: return int(s)
+		except ValueError: return -1
+	varnames = map(map_postfix, varnames)
+	varnames.sort()
+	if len(varnames) == 0:
+		return start
+	return varnames[-1] + incr
+
+
+def _opiter(codestr):
+	i = 0
+	codelen = len(codestr)
+	while i < codelen:
+		codeaddr = i
+		op = ord(codestr[i])
+		i += 1
+
+		if op >= dis.HAVE_ARGUMENT:
+			b1,b2 = map(ord, codestr[i:i+2])
+			arg = b2 * 256 + b1
+			del b1,b2
+			i += 2
+		else:
+			arg = None
+
+		yield (codeaddr, op, arg)
+
+
+def _codeops_compile(codeops):
+	codestr = ""
+	for opname,arg in codeops:
+		codestr += chr(dis.opmap[opname])
+		if op >= dis.HAVE_ARGUMENT:
+			assert arg is not None
+			assert arg >= 0 and arg < 256 * 256
+			codestr += chr(arg & 255) + chr(arg >> 8)
+		else:
+			assert arg is None
+	return codestr
+
+
+def _list_getobjoradd(consts, obj):
+	for i in range(len(consts)):
+		if consts[i] is obj:
+			return consts, i
+	return consts + [obj], len(consts)
+
 def simplify_loops(func):
 	"""
 	Returns a new modified version of `func` which behaves exactly the same but
@@ -318,39 +371,61 @@ def simplify_loops(func):
 	for `restart_func`.
 	"""
 
-	codestr = list(map(ord, func.func_code.co_code))
-	opaddrmap = dict(zip(range(len(codestr)), range(len(codestr))))
+	names = list(func.func_code.co_names)
+	names, names_next_idx = _list_getobjoradd(consts, "next")
+	names, names_StopIter_idx = _list_getobjoradd(consts, "StopIteration")
 
-	# TODO: search for FOR_ITER, etc...
+	varnames = list(func.func_code.co_varnames)
+	varidx = _get_varnameprefix_startidx(varnames, "__loopiter")
 
-	# TODO: fix up lnotab.
-	lnotab = ""
+	codeobj = func.func_code
+	oplist = list(_opiter(codeobj.co_code))
 
-	# Fix up the absolute jumps.
-	i = 0
-	while i < len(codestr):
-		op = codestr[i]
-		i += 1
+	codeaddrdiff = 0
+	for i in range(len(oplist)):
+		codeaddr, op, arg = oplist[i]
+		codeaddr += codeaddrdiff
 
-		if op >= dis.HAVE_ARGUMENT:
-			b1 = codestr[i]
-			b2 = codestr[i+1]
-			num = b2 * 256 + b1
-			del b1,b2
-			i += 2
-		else:
-			num = 0
+		if op == dis.opmap["FOR_ITER"]:
+			forIterAddr = codeaddr
+			forIterAbsJumpTarget = codeaddr + 3 + arg
 
-		if op in dis.hasjabs:
-			assert op >= dis.HAVE_ARGUMENT
-			num = opaddrmap[num]
-			codestr[i-2] = chr(num & 255)
-			codestr[i-1] = chr(num >> 8)
+			# We expect the next op to be STORE_FAST, where we store the result of `next(iter)`.
+			assert i < len(oplist) - 1 and oplist[i+1][1] == dis.opmap["STORE_FAST"]
+			nextvar_varnameidx = oplist[i+1][2]
+
+			# First, store the FOR_ITER iterator in a local variable.
+			varnameidx = len(varnames)
+			varnames += ["__loopiter_%i" % varidx]
+			varidx += 1
+			codeops = [("STORE_FAST", varnameidx)]
+
+			# Now call `next()` on it and catch StopIteration.
+			codeops += [
+				("SETUP_EXCEPT", 16), # in case of exception, jump to DUP_TOP
+				("LOAD_GLOBAL", names_next_idx),
+				("LOAD_FAST", varnameidx),
+				("CALL_FUNCTION", 1),
+				("STORE_FAST", nextvar_varnameidx),
+				("POP_BLOCK", None),
+				("JUMP_FORWARD", 19), # jump outside of `try/except`, one after END_FINALLY
+				("DUP_TOP", None),
+				("LOAD_GLOBAL", names_StopIter_idx),
+				("COMPARE_OP", 10),
+				("POP_JUMP_IF_FALSE", 33 + forIterAddr), # jump to END_FINALLY
+				("POP_TOP", None),
+				("POP_TOP", None),
+				("POP_TOP", None),
+				("JUMP_ABSOLUTE", forIterAbsJumpTarget),
+				("END_FINALLY", None)
+			]
+
+			codestr = _codeops_compile(codeops)
 
 	new_code = _modified_code(
-		func.func_code,
-		code="".join(map(chr, codestr)),
-		lnotab=lnotab,
+		codeobj,
+		varnames=varnames,
+		consts=consts,
 	)
 	new_func = types.FunctionType(
 		new_code,

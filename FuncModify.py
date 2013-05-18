@@ -140,9 +140,24 @@ def replace_code(codeobj, instaddr, removelen, addcodestr):
 	assert codeidx == instaddr + removelen, "removelen %i doesn't align in code" % removelen
 
 	# Update lnotab for removed code.
-	codelendiff = -removelen
-	while codelendiff < 0:
-		pass
+	while lnotab_idx < lnotab_len:
+		if lnotab_instaddr >= instaddr + removelen: break
+		addrincr, lineincr = map(ord, lnotab[lnotab_idx:lnotab_idx+2])
+		lnotab_instaddr += addrincr
+		lnotab_idx += 2
+	assert lnotab_instaddr >= instaddr + removelen, "lnotab is invalid"
+
+	# If we skipped it, insert a dummy entry to lnotab.
+	if lnotab_instaddr > instaddr + removelen:
+		# Insert. addrincr, lineincr are from the last entry.
+		lnotab = \
+			lnotab[:lnotab_idx-2] + \
+			chr(addrincr - (lnotab_instaddr - (instaddr + removelen))) + chr(0) + \
+			chr(lnotab_instaddr - (instaddr + removelen)) + chr(lineincr) + \
+			lnotab[lnotab_idx:]
+		lnotab_idx -= 2
+		lnotab_instaddr = instaddr + removelen
+	assert lnotab_instaddr == instaddr + removelen
 
 	# Update lnotab for new code.
 	codelendiff = len(addcodestr)
@@ -152,6 +167,8 @@ def replace_code(codeobj, instaddr, removelen, addcodestr):
 			chr(codelendiff & 255) + chr(0) + \
 			lnotab[lnotab_idx:]
 		codelendiff -= codelendiff & 255
+	assert codelendiff == 0
+	del codelendiff
 
 	# Check whether addcodestr is sane.
 	codeidx = 0
@@ -167,6 +184,8 @@ def replace_code(codeobj, instaddr, removelen, addcodestr):
 		codestr[:instaddr] + \
 		addcodestr + \
 		codestr[instaddr+removelen:]
+
+	# TODO: update abs jumps.
 
 	# Return new code object.
 	new_code = _modified_code(

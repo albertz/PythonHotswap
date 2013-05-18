@@ -199,7 +199,7 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 
 	# Update absolute jumps in code middle.
 	def addcodestr_jumpaddrmap(n):
-		if n <= instaddr: return n
+		if n <= instaddr + len(addcodestr): return n
 		if n >= instaddr + removelen: return n - removelen
 		assert False, "invalid jump %i in addcodestr"
 	codestr_middle = _modified_abs_jumps(
@@ -372,8 +372,8 @@ def simplify_loops(func):
 	"""
 
 	names = list(func.func_code.co_names)
-	names, names_next_idx = _list_getobjoradd(consts, "next")
-	names, names_StopIter_idx = _list_getobjoradd(consts, "StopIteration")
+	names, names_next_idx = _list_getobjoradd(names, "next")
+	names, names_StopIter_idx = _list_getobjoradd(names, "StopIteration")
 
 	varnames = list(func.func_code.co_varnames)
 	varidx = _get_varnameprefix_startidx(varnames, "__loopiter")
@@ -408,7 +408,7 @@ def simplify_loops(func):
 				("CALL_FUNCTION", 1),
 				("STORE_FAST", nextvar_varnameidx),
 				("POP_BLOCK", None),
-				("JUMP_FORWARD", 19), # jump outside of `try/except`, one after END_FINALLY
+				("JUMP_FORWARD", 17), # jump outside of `try/except`, one after END_FINALLY
 				("DUP_TOP", None),
 				("LOAD_GLOBAL", names_StopIter_idx),
 				("COMPARE_OP", 10),

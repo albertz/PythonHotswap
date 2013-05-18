@@ -197,22 +197,13 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 		codestr[:instaddr],
 		jumpaddrmap=codestr_jumpaddrmap)
 
-	# Update absolute jumps in code middle.
-	def addcodestr_jumpaddrmap(n):
-		if n <= instaddr + len(addcodestr): return n
-		if n >= instaddr + removelen: return n - removelen
-		assert False, "invalid jump %i in addcodestr"
-	codestr_middle = _modified_abs_jumps(
-		addcodestr,
-		jumpaddrmap=addcodestr_jumpaddrmap)
-
 	# Update absolute jumps in code end.
 	codestr_end = _modified_abs_jumps(
 		codestr[instaddr+removelen:],
 		jumpaddrmap=codestr_jumpaddrmap)
 
 	# Update codestr.
-	codestr = codestr_start + codestr_middle + codestr_end
+	codestr = codestr_start + addcodestr + codestr_end
 
 	# Return new code object.
 	new_code = _modified_code(
@@ -421,11 +412,14 @@ def simplify_loops(func):
 			]
 
 			codestr = _codeops_compile(codeops)
+			removelen = 6 # FOR_ITER and STORE_FAST
+			codeaddrdiff += len(codestr) - removelen
+			codeobj = replace_code(codeobj, instaddr=codeaddr, removelen=removelen, addcodestr=codestr)
 
 	new_code = _modified_code(
 		codeobj,
 		varnames=varnames,
-		consts=consts,
+		names=names,
 	)
 	new_func = types.FunctionType(
 		new_code,

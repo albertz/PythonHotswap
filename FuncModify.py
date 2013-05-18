@@ -5,8 +5,15 @@
 import dis
 import types
 
-def _modified_abs_jumps(codestr, start, end, jumprel):
+def _modified_abs_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end=None):
+	if jumprel is not None:
+		assert jumpaddrmap is None, "specify only one of jumprel and jumpaddrmap"
+		jumpaddrmap = lambda n: n + jumprel
+	assert jumpaddrmap is not None, "one of jumprel and jumpaddrmap must be specified"
+
 	codestr = bytearray(codestr)
+	if start is None: start = 0
+	if end is None: end = len(codestr)
 	i = start
 	while i < end:
 		op = codestr[i]
@@ -23,7 +30,7 @@ def _modified_abs_jumps(codestr, start, end, jumprel):
 
 		if op in dis.hasjabs:
 			assert op >= dis.HAVE_ARGUMENT
-			num += jumprel
+			num = jumpaddrmap(jumprel)
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
 
@@ -90,12 +97,14 @@ def _find_setup_blocks(codestr, start, end):
 	return blockstack
 
 
-def replace_code(codeobj, instaddr, removelen, addcodestr):
+def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 	assert isinstance(codeobj, types.CodeType)
-	lnotab = codeobj.co_lnotab
-	assert len(lnotab) % 2 == 0
+	assert removelen >= 0
+	if removelen == 0 and len(addcodestr) == 0: return codeobj
 
 	# Search right place in lnotab.
+	lnotab = codeobj.co_lnotab
+	assert len(lnotab) % 2 == 0
 	lnotab_instaddr = 0
 	lnotab_idx = 0
 	lnotab_len = len(lnotab)
@@ -179,13 +188,30 @@ def replace_code(codeobj, instaddr, removelen, addcodestr):
 		if op >= dis.HAVE_ARGUMENT: codeidx += 2
 	assert codeidx == codelen, "addcodestr is not sane"
 
-	# Update codestr.
-	codestr = \
-		codestr[:instaddr] + \
-		addcodestr + \
-		codestr[instaddr+removelen:]
+	# Update absolute jumps in code start.
+	def codestr_jumpaddrmap(n):
+		if n < instaddr: return n
+		if n >= instaddr + removelen: return n - removelen
+		assert False, "invalid jump %i in start code" % n
+	codestr_start = _modified_abs_jumps(
+		codestr[:instaddr],
+		jumpaddrmap=codestr_jumpaddrmap)
 
-	# TODO: update abs jumps.
+	# Update absolute jumps in code middle.
+	def addcodestr_jumpaddrmap(n):
+		if n < len(addcodestr): return n + instaddr
+		assert False, "invalid jump %i in addcodestr"
+	codestr_middle = _modified_abs_jumps(
+		addcodestr,
+		jumpaddrmap=addcodestr_jumpaddrmap)
+
+	# Update absolute jumps in code end.
+	codestr_end = _modified_abs_jumps(
+		codestr[instaddr+removelen:],
+		jumpaddrmap=codestr_jumpaddrmap)
+
+	# Update codestr.
+	codestr = codestr_start + codestr_middle + codestr_end
 
 	# Return new code object.
 	new_code = _modified_code(

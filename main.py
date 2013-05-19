@@ -212,10 +212,14 @@ def test_simplify_loop():
 		print "baz"
 	print "normal:"
 	dis.dis(func)
+	func()
 	print "simplified:"
 	dis.dis(func_simplified)
+	func_simplified()
 	print "auto simplified:"
-	dis.dis(simplify_loops(func))
+	func_autosimple = simplify_loops(func)
+	dis.dis(func_autosimple)
+	func_autosimple()
 
 
 def demo4():

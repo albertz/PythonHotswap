@@ -359,9 +359,9 @@ def _codeops_compile(codeops):
 	return codestr
 
 
-def _list_getobjoradd(consts, obj):
+def _list_getobjoradd(consts, obj, equalop=lambda (a,b): a is b):
 	for i in range(len(consts)):
-		if consts[i] is obj:
+		if equalop(consts[i], obj):
 			return consts, i
 	return consts + (obj,), len(consts)
 
@@ -422,6 +422,20 @@ def simplify_loops(func):
 			codeaddrdiff += 3 # the STORE_FAST
 			codeaddr += 3
 
+			# debug
+			codeobj = replace_code(
+				codeobj,
+				instaddr=codeaddr,
+				removelen=0,
+				addcodestr=_codeops_compile([
+					("LOAD_FAST", varnameidx),
+					("PRINT_ITEM", None),
+					("PRINT_NEWLINE", None),
+				]))
+			codeaddrdiff += 5
+			codeaddr += 5
+			# debug end
+
 			forIterAddr = codeaddr
 			forIterAbsJumpTarget = codeaddr + 3 + arg
 
@@ -455,6 +469,58 @@ def simplify_loops(func):
 			removelen = 6 # FOR_ITER and STORE_FAST
 			codeaddrdiff += len(codestr) - removelen
 			codeobj = replace_code(codeobj, instaddr=codeaddr, removelen=removelen, addcodestr=codestr)
+
+	new_func = types.FunctionType(
+		codeobj,
+		func.func_globals,
+		func.func_name,
+		func.func_defaults,
+		func.func_closure,
+	)
+	return new_func
+
+
+def add_debug_prints_after_stores(func):
+	"""
+	Returns a new modified version of `func` which prints
+	every value after a STORE_FAST.
+	"""
+
+	codeobj = func.func_code
+
+	consts = codeobj.co_consts
+	varnameindexes = [None] * len(codeobj.co_varnames)
+	for i in range(len(varnameindexes)):
+		consts, varnameindexes[i] = _list_getobjoradd(consts, codeobj.co_varnames[i])
+	consts, equalstridx = _list_getobjoradd(consts, "=")
+	codeobj = _modified_code(
+		codeobj,
+		consts=consts,
+	)
+
+	oplist = list(_opiter(codeobj.co_code))
+	codeaddrdiff = 0
+	for i in range(len(oplist)):
+		codeaddr, op, arg = oplist[i]
+		codeaddr += codeaddrdiff
+
+		if op == dis.opmap["STORE_FAST"]:
+			varidx = arg
+			assert 0 <= varidx < len(varnameindexes)
+			codeobj = replace_code(
+				codeobj,
+				instaddr=codeaddr+3, # right after the STORE_FAST
+				removelen=0,
+				addcodestr=_codeops_compile([
+					("LOAD_CONST", varnameindexes[i]),
+					("PRINT_ITEM", None),
+					("LOAD_CONST", equalstridx),
+					("PRINT_ITEM", None),
+					("LOAD_FAST", varidx), # load the same var
+					("PRINT_ITEM", None),
+					("PRINT_NEWLINE", None)
+				])
+			)
 
 	new_func = types.FunctionType(
 		codeobj,

@@ -412,7 +412,7 @@ def simplify_loops(func):
 				("DUP_TOP", None),
 				("LOAD_GLOBAL", names_StopIter_idx),
 				("COMPARE_OP", 10),
-				("POP_JUMP_IF_FALSE", 33 + forIterAddr), # jump to END_FINALLY
+				("POP_JUMP_IF_FALSE", 38 + forIterAddr), # jump to END_FINALLY
 				("POP_TOP", None),
 				("POP_TOP", None),
 				("POP_TOP", None),

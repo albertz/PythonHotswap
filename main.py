@@ -4,7 +4,7 @@
 
 import sys
 import dis
-from FuncModify import restart_func, simplify_loops
+from FuncModify import *
 
 def _find_traceframe(tb, code):
 	while tb:
@@ -219,6 +219,7 @@ def test_simplify_loop():
 	print "auto simplified:"
 	func_autosimple = simplify_loops(func)
 	dis.dis(func_autosimple)
+	add_debug_prints_after_stores(func_autosimple)()
 	func_autosimple()
 
 

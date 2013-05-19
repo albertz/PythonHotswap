@@ -359,7 +359,7 @@ def _codeops_compile(codeops):
 	return codestr
 
 
-def _list_getobjoradd(consts, obj, equalop=lambda (a,b): a is b):
+def _list_getobjoradd(consts, obj, equalop=lambda a,b: a is b):
 	for i in range(len(consts)):
 		if equalop(consts[i], obj):
 			return consts, i
@@ -491,8 +491,8 @@ def add_debug_prints_after_stores(func):
 	consts = codeobj.co_consts
 	varnameindexes = [None] * len(codeobj.co_varnames)
 	for i in range(len(varnameindexes)):
-		consts, varnameindexes[i] = _list_getobjoradd(consts, codeobj.co_varnames[i])
-	consts, equalstridx = _list_getobjoradd(consts, "=")
+		consts, varnameindexes[i] = _list_getobjoradd(consts, codeobj.co_varnames[i], lambda a,b: a == b)
+	consts, equalstridx = _list_getobjoradd(consts, "=", lambda a,b: a == b)
 	codeobj = _modified_code(
 		codeobj,
 		consts=consts,
@@ -512,7 +512,7 @@ def add_debug_prints_after_stores(func):
 				instaddr=codeaddr+3, # right after the STORE_FAST
 				removelen=0,
 				addcodestr=_codeops_compile([
-					("LOAD_CONST", varnameindexes[i]),
+					("LOAD_CONST", varnameindexes[varidx]),
 					("PRINT_ITEM", None),
 					("LOAD_CONST", equalstridx),
 					("PRINT_ITEM", None),

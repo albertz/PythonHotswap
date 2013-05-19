@@ -5,7 +5,7 @@
 import dis
 import types
 
-def _modified_abs_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end=None):
+def _modified_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end=None):
 	if jumprel is not None:
 		assert jumpaddrmap is None, "specify only one of jumprel and jumpaddrmap"
 		jumpaddrmap = lambda n: n + jumprel
@@ -34,6 +34,14 @@ def _modified_abs_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
 
+		if op in dis.hasjrel and jumprel is None:
+			assert op >= dis.HAVE_ARGUMENT
+			num += i # because it is a relative jump
+			num = jumpaddrmap(num) # map
+			num -= i # convert back to relative jump
+			codestr[i-2] = chr(num & 255)
+			codestr[i-1] = chr(num >> 8)
+
 	return str(codestr)
 
 def _codestr_without_final_return(codestr):
@@ -45,7 +53,7 @@ def _codestr_without_final_return(codestr):
 def _prefix_codestr(codestr1, codestr2):
 	# see dis.findlinestarts() about co_firstlineno and co_lnotab
 	codestr = codestr1 + codestr2
-	codestr = _modified_abs_jumps(codestr, start=len(codestr1), end=len(codestr), jumprel=len(codestr1))
+	codestr = _modified_jumps(codestr, start=len(codestr1), end=len(codestr), jumprel=len(codestr1))
 	return codestr
 
 def _modified_code(c, **kwargs):
@@ -193,12 +201,12 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 		if n <= instaddr: return n
 		if n >= instaddr + removelen: return n - removelen
 		assert False, "invalid jump %i in code" % n
-	codestr_start = _modified_abs_jumps(
+	codestr_start = _modified_jumps(
 		codestr[:instaddr],
 		jumpaddrmap=codestr_jumpaddrmap)
 
 	# Update absolute jumps in code end.
-	codestr_end = _modified_abs_jumps(
+	codestr_end = _modified_jumps(
 		codestr[instaddr+removelen:],
 		jumpaddrmap=codestr_jumpaddrmap)
 

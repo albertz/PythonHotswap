@@ -2,6 +2,7 @@
 # All rights reserved.
 # Code under 2-clause BSD licence.
 
+# Demo for `restart_func`.
 
 import sys
 import dis

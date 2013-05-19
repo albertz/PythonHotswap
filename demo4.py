@@ -2,6 +2,7 @@
 # All rights reserved.
 # Code under 2-clause BSD licence.
 
+# Same as `demo3` but with `for`-loops.
 
 import sys
 import dis
@@ -12,18 +13,13 @@ from utils import *
 def demo4():
 	def func():
 		bug = True
-		while True:
-			__loopiter_1
-			print i
+		for i in range(3):
+			print "a:", i
+		for i in range(3):
+			print "b:", i
 			if bug: raise Exception
 
-	dis.dis(func)
-
-	print "simplify_loops:"
 	func = simplify_loops(func)
-	dis.dis(func)
-
-	return func
 
 	try:
 		func()

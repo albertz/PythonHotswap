@@ -443,11 +443,11 @@ def simplify_loops(func):
 				("DUP_TOP", None),
 				("LOAD_GLOBAL", names_StopIter_idx),
 				("COMPARE_OP", 10), # exception match
-				("POP_JUMP_IF_FALSE", 38 + forIterAddr), # jump to END_FINALLY
+				("POP_JUMP_IF_FALSE", 35 + forIterAddr), # jump to END_FINALLY
 				("POP_TOP", None),
 				("POP_TOP", None),
 				("POP_TOP", None),
-				("JUMP_ABSOLUTE", forIterAbsJumpTarget + 36), # the target + the replace-diff
+				("JUMP_ABSOLUTE", forIterAbsJumpTarget + 30), # the FOR_ITER target (adjusted with diff)
 				("END_FINALLY", None),
 			]
 

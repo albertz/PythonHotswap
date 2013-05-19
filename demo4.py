@@ -28,7 +28,7 @@ def demo4():
 		print "! Exception"
 		_,_,tb = sys.exc_info()
 
-	tb = _find_traceframe(tb, func.func_code)
+	tb = find_traceframe(tb, func.func_code)
 	assert tb is not None
 
 	# Start just at where the exception was raised.

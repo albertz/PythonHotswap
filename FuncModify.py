@@ -131,7 +131,6 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 			chr(addrincr - (lnotab_instaddr - instaddr)) + chr(0) + \
 			chr(lnotab_instaddr - instaddr) + chr(lineincr) + \
 			lnotab[lnotab_idx:]
-		lnotab_idx -= 2
 		lnotab_instaddr = instaddr
 	del addrincr, lineincr
 	assert lnotab_instaddr == instaddr
@@ -157,10 +156,14 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 	assert codeidx == instaddr + removelen, "removelen %i doesn't align in code" % removelen
 
 	# Update lnotab for removed code.
+	start_lnotab_idx = lnotab_idx
+	lineincrcount = 0
+	# Search for the end pos of the removed code.
 	while lnotab_idx < lnotab_len:
 		if lnotab_instaddr >= instaddr + removelen: break
 		addrincr, lineincr = map(ord, lnotab[lnotab_idx:lnotab_idx+2])
 		lnotab_instaddr += addrincr
+		lineincrcount += lineincr
 		lnotab_idx += 2
 	assert lnotab_instaddr >= instaddr + removelen, "lnotab is invalid"
 
@@ -169,12 +172,25 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 		# Insert. addrincr, lineincr are from the last entry.
 		lnotab = \
 			lnotab[:lnotab_idx-2] + \
-			chr(addrincr - (lnotab_instaddr - (instaddr + removelen))) + chr(0) + \
-			chr(lnotab_instaddr - (instaddr + removelen)) + chr(lineincr) + \
+			chr(addrincr - (lnotab_instaddr - (instaddr + removelen))) + chr(lineincr) + \
+			chr(lnotab_instaddr - (instaddr + removelen)) + chr(0) + \
 			lnotab[lnotab_idx:]
-		lnotab_idx -= 2
 		lnotab_instaddr = instaddr + removelen
 	assert lnotab_instaddr == instaddr + removelen
+	# And lnotab_idx is right where the upcoming lnotab-data starts.
+
+	# Remove lnotab[start_lnotab_idx:lnotab] but add the lineincrcount.
+	if start_lnotab_idx < lnotab_idx:
+		lnotab = \
+			lnotab[:start_lnotab_idx] + \
+			lnotab[lnotab_idx:]
+		lnotab_idx = start_lnotab_idx
+		while lineincrcount > 0:
+			lnotab = \
+				lnotab[:start_lnotab_idx] + \
+				chr(0) + chr(lineincrcount & 255) + \
+				lnotab[start_lnotab_idx:]
+			lineincrcount -= lineincrcount & 255
 
 	# Update lnotab for new code.
 	codelendiff = len(addcodestr)

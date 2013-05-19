@@ -49,7 +49,7 @@ def demo2():
 		excinfo = sys.exc_info()
 		sys.excepthook(*excinfo)
 		tb = excinfo[-1]
-	tb = _find_traceframe(tb, func.func_code)
+	tb = find_traceframe(tb, func.func_code)
 	assert tb is not None
 	localdict = dict(tb.tb_frame.f_locals)
 
@@ -69,7 +69,7 @@ def demo2():
 	tmpfnmod = imp.load_source("tmpfnmod", tmpfn)
 	func = tmpfnmod.main
 	# Calculate new line number.
-	newlineno = _calc_newlineno_via_diff(tb.tb_lineno, tmpbackupfn, tmpfn)
+	newlineno = calc_newlineno_via_diff(tb.tb_lineno, tmpbackupfn, tmpfn)
 	print "Restarting in line %i at %r" % (newlineno, open(tmpfn).readlines()[newlineno-1].strip())
 	# Use that instruction address.
 	instraddr = min([addr for (addr,lineno) in dis.findlinestarts(func.func_code) if lineno >= newlineno])

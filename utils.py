@@ -3,14 +3,14 @@
 # Code under 2-clause BSD licence.
 
 
-def _find_traceframe(tb, code):
+def find_traceframe(tb, code):
 	while tb:
 		if tb.tb_frame.f_code is code: return tb
 		tb = tb.tb_next
 	return None
 
 
-def _calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
+def calc_newlineno_via_diff(oldlineno, oldfilename, newfilename):
 	from subprocess import Popen, PIPE
 	diffcmd = ["diff", "-EbwB", "-U", "0"]
 	diffout = Popen(diffcmd + [oldfilename, newfilename], stdout=PIPE).stdout.readlines()

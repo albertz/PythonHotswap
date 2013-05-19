@@ -346,8 +346,9 @@ def _opiter(codestr):
 
 def _codeops_compile(codeops):
 	codestr = ""
-	for opname,arg in codeops:
-		op = dis.opmap[opname]
+	for op,arg in codeops:
+		if isinstance(op, str):
+			op = dis.opmap[op]
 		codestr += chr(op)
 		if op >= dis.HAVE_ARGUMENT:
 			assert arg is not None
@@ -371,22 +372,56 @@ def simplify_loops(func):
 	for `restart_func`.
 	"""
 
+	codeobj = func.func_code
+
 	names = func.func_code.co_names
 	names, names_next_idx = _list_getobjoradd(names, "next")
 	names, names_StopIter_idx = _list_getobjoradd(names, "StopIteration")
+	codeobj = _modified_code(
+		codeobj,
+		names=names,
+	)
 
 	varnames = func.func_code.co_varnames
 	varidx = _get_varnameprefix_startidx(varnames, "__loopiter")
 
-	codeobj = func.func_code
 	oplist = list(_opiter(codeobj.co_code))
-
 	codeaddrdiff = 0
 	for i in range(len(oplist)):
 		codeaddr, op, arg = oplist[i]
 		codeaddr += codeaddrdiff
 
 		if op == dis.opmap["FOR_ITER"]:
+			# Get a new unique variable name for the iterator object.
+			varnameidx = len(varnames)
+			varnames += ("__loopiter_%i" % varidx,)
+			varidx += 1
+			codeobj = _modified_code(
+				codeobj,
+				varnames=varnames,
+			)
+
+			# We expect that the loop jumps back to the FOR_ITER and thus expects
+			# to have one item (the iter) on the stack. We don't want that for
+			# simple code resuming (via `restart_func`) because it is not what we have
+			# in a simple `while` loop.
+			# Thus, right in front of the FOR_ITER, insert the STORE_FAST for the iter.
+
+			# The way `replace_code` works, we need to replace the previous op because
+			# we want that jumps to the FOR_ITER keeps pointing there.
+			assert i > 0
+			codestr = _codeops_compile([
+				(oplist[i-1][1], oplist[i-1][2]),
+				("STORE_FAST", varnameidx)
+			])
+			codeobj = replace_code(
+				codeobj,
+				instaddr=oplist[i-1][0] + codeaddrdiff, # at the last op
+				removelen=oplist[i][0] - oplist[i-1][0], # just the last op
+				addcodestr=codestr)
+			codeaddrdiff += 3 # the STORE_FAST
+			codeaddr += 3
+
 			forIterAddr = codeaddr
 			forIterAbsJumpTarget = codeaddr + 3 + arg
 
@@ -394,16 +429,10 @@ def simplify_loops(func):
 			assert i < len(oplist) - 1 and oplist[i+1][1] == dis.opmap["STORE_FAST"]
 			nextvar_varnameidx = oplist[i+1][2]
 
-			# First, store the FOR_ITER iterator in a local variable.
-			varnameidx = len(varnames)
-			varnames += ("__loopiter_%i" % varidx,)
-			varidx += 1
-			codeops = [("STORE_FAST", varnameidx)]
-
 			# Now call `next()` on it and catch StopIteration.
 			# Note that all jump-constants here are carefully adjusted.
 			# If you change something here, probably all of them need to be updated!
-			codeops += [
+			codeops = [
 				("SETUP_EXCEPT", 16), # in case of exception, jump to DUP_TOP
 				("LOAD_GLOBAL", names_next_idx),
 				("LOAD_FAST", varnameidx),
@@ -420,7 +449,6 @@ def simplify_loops(func):
 				("POP_TOP", None),
 				("JUMP_ABSOLUTE", forIterAbsJumpTarget + 36), # the target + the replace-diff
 				("END_FINALLY", None),
-				("LOAD_FAST", varnameidx), # FOR_ITER leaves the iter on the stack
 			]
 
 			codestr = _codeops_compile(codeops)
@@ -428,13 +456,8 @@ def simplify_loops(func):
 			codeaddrdiff += len(codestr) - removelen
 			codeobj = replace_code(codeobj, instaddr=codeaddr, removelen=removelen, addcodestr=codestr)
 
-	new_code = _modified_code(
-		codeobj,
-		varnames=varnames,
-		names=names,
-	)
 	new_func = types.FunctionType(
-		new_code,
+		codeobj,
 		func.func_globals,
 		func.func_name,
 		func.func_defaults,

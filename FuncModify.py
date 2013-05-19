@@ -504,7 +504,12 @@ def add_debug_prints_after_stores(func):
 		if op == dis.opmap["STORE_FAST"]:
 			varidx = arg
 			assert 0 <= varidx < len(varnameindexes)
+
+			# Replace the STORE_FAST by the following code. All jumps to
+			# it stay intact while jumps to the next instr will also stay
+			# intact (and not become jumps to this code).
 			addcodestr = _codeops_compile([
+				(op, arg),
 				("LOAD_CONST", varnameindexes[varidx]),
 				("PRINT_ITEM", None),
 				("LOAD_CONST", equalstridx),
@@ -515,11 +520,11 @@ def add_debug_prints_after_stores(func):
 			])
 			codeobj = replace_code(
 				codeobj,
-				instaddr=codeaddr+3, # right after the STORE_FAST
-				removelen=0,
+				instaddr=codeaddr,
+				removelen=3, # remove the STORE_FAST
 				addcodestr=addcodestr
 			)
-			codeaddrdiff += len(addcodestr)
+			codeaddrdiff += len(addcodestr) - 3
 
 
 	new_func = types.FunctionType(

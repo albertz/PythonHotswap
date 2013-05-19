@@ -219,8 +219,12 @@ def test_simplify_loop():
 	print "auto simplified:"
 	func_autosimple = simplify_loops(func)
 	dis.dis(func_autosimple)
-	add_debug_prints_after_stores(func_autosimple)()
 	func_autosimple()
+	print "debug:"
+	func_debug = add_debug_prints_after_stores(func_autosimple)
+	dis.dis(func_debug)
+	func_debug()
+	return func_debug
 
 
 def demo4():

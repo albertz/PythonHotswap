@@ -8,7 +8,7 @@ import types
 def _modified_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end=None):
 	if jumprel is not None:
 		assert jumpaddrmap is None, "specify only one of jumprel and jumpaddrmap"
-		jumpaddrmap = lambda n: n + jumprel
+		jumpaddrmap = lambda addr, op, n: n + jumprel
 	assert jumpaddrmap is not None, "one of jumprel and jumpaddrmap must be specified"
 
 	codestr = bytearray(codestr)
@@ -30,14 +30,14 @@ def _modified_jumps(codestr, jumprel=None, jumpaddrmap=None, start=None, end=Non
 
 		if op in dis.hasjabs:
 			assert op >= dis.HAVE_ARGUMENT
-			num = jumpaddrmap(num)
+			num = jumpaddrmap(i, op, num)
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
 
 		if op in dis.hasjrel and jumprel is None:
 			assert op >= dis.HAVE_ARGUMENT
 			num += i # because it is a relative jump
-			num = jumpaddrmap(num) # map
+			num = jumpaddrmap(i, op, num) # map
 			num -= i # convert back to relative jump
 			codestr[i-2] = chr(num & 255)
 			codestr[i-1] = chr(num >> 8)
@@ -196,19 +196,26 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 		if op >= dis.HAVE_ARGUMENT: codeidx += 2
 	assert codeidx == codelen, "addcodestr is not sane. %r" % ((codeidx, codelen),)
 
-	# Update absolute jumps in code start.
-	def codestr_jumpaddrmap(n):
+	# Update jumps in code start.
+	def codestr_start_jumpaddrmap(addr, op, n):
 		if n <= instaddr: return n
 		if n >= instaddr + removelen: return n - removelen + len(addcodestr)
 		assert False, "invalid jump %i in code" % n
 	codestr_start = _modified_jumps(
 		codestr[:instaddr],
-		jumpaddrmap=codestr_jumpaddrmap)
+		jumpaddrmap=codestr_start_jumpaddrmap)
 
-	# Update absolute jumps in code end.
+	# Update jumps in code end.
+	def codestr_end_jumpaddrmap(addr, op, n):
+		if op in dis.hasjrel:
+			assert n > 0 # I think this is true?
+			return n # Never modify this!
+		if n <= instaddr: return n
+		if n >= instaddr + removelen: return n - removelen + len(addcodestr)
+		assert False, "invalid jump %i in code" % n
 	codestr_end = _modified_jumps(
 		codestr[instaddr+removelen:],
-		jumpaddrmap=codestr_jumpaddrmap)
+		jumpaddrmap=codestr_end_jumpaddrmap)
 
 	# Update codestr.
 	codestr = codestr_start + addcodestr + codestr_end

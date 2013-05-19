@@ -199,7 +199,7 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 	# Update absolute jumps in code start.
 	def codestr_jumpaddrmap(n):
 		if n <= instaddr: return n
-		if n >= instaddr + removelen: return n - removelen
+		if n >= instaddr + removelen: return n - removelen + len(addcodestr)
 		assert False, "invalid jump %i in code" % n
 	codestr_start = _modified_jumps(
 		codestr[:instaddr],
@@ -417,7 +417,8 @@ def simplify_loops(func):
 				("POP_TOP", None),
 				("POP_TOP", None),
 				("JUMP_ABSOLUTE", forIterAbsJumpTarget),
-				("END_FINALLY", None)
+				("END_FINALLY", None),
+				("LOAD_FAST", varnameidx), # FOR_ITER leaves the iter on the stack
 			]
 
 			codestr = _codeops_compile(codeops)

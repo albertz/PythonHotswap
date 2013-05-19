@@ -401,6 +401,8 @@ def simplify_loops(func):
 			codeops = [("STORE_FAST", varnameidx)]
 
 			# Now call `next()` on it and catch StopIteration.
+			# Note that all jump-constants here are carefully adjusted.
+			# If you change something here, probably all of them need to be updated!
 			codeops += [
 				("SETUP_EXCEPT", 16), # in case of exception, jump to DUP_TOP
 				("LOAD_GLOBAL", names_next_idx),
@@ -411,12 +413,12 @@ def simplify_loops(func):
 				("JUMP_FORWARD", 17), # jump outside of `try/except`, one after END_FINALLY
 				("DUP_TOP", None),
 				("LOAD_GLOBAL", names_StopIter_idx),
-				("COMPARE_OP", 10),
+				("COMPARE_OP", 10), # exception match
 				("POP_JUMP_IF_FALSE", 38 + forIterAddr), # jump to END_FINALLY
 				("POP_TOP", None),
 				("POP_TOP", None),
 				("POP_TOP", None),
-				("JUMP_ABSOLUTE", forIterAbsJumpTarget),
+				("JUMP_ABSOLUTE", forIterAbsJumpTarget + 36), # the target + the replace-diff
 				("END_FINALLY", None),
 				("LOAD_FAST", varnameidx), # FOR_ITER leaves the iter on the stack
 			]

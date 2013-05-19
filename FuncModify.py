@@ -380,6 +380,7 @@ def simplify_loops(func):
 	codeobj = _modified_code(
 		codeobj,
 		names=names,
+		stacksize=codeobj.co_stacksize + 3 # not sure how much more we need, but e.g. there is a SETUP_EXPECT
 	)
 
 	varnames = codeobj.co_varnames

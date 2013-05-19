@@ -507,20 +507,23 @@ def add_debug_prints_after_stores(func):
 		if op == dis.opmap["STORE_FAST"]:
 			varidx = arg
 			assert 0 <= varidx < len(varnameindexes)
+			addcodestr = _codeops_compile([
+				("LOAD_CONST", varnameindexes[varidx]),
+				("PRINT_ITEM", None),
+				("LOAD_CONST", equalstridx),
+				("PRINT_ITEM", None),
+				("LOAD_FAST", varidx), # load the same var
+				("PRINT_ITEM", None),
+				("PRINT_NEWLINE", None)
+			])
 			codeobj = replace_code(
 				codeobj,
 				instaddr=codeaddr+3, # right after the STORE_FAST
 				removelen=0,
-				addcodestr=_codeops_compile([
-					("LOAD_CONST", varnameindexes[varidx]),
-					("PRINT_ITEM", None),
-					("LOAD_CONST", equalstridx),
-					("PRINT_ITEM", None),
-					("LOAD_FAST", varidx), # load the same var
-					("PRINT_ITEM", None),
-					("PRINT_NEWLINE", None)
-				])
+				addcodestr=addcodestr
 			)
+			codeaddrdiff += len(addcodestr)
+
 
 	new_func = types.FunctionType(
 		codeobj,

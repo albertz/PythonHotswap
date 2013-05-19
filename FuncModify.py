@@ -425,20 +425,6 @@ def simplify_loops(func):
 			codeaddrdiff += 3 # the STORE_FAST
 			codeaddr += 3
 
-			# debug
-			codeobj = replace_code(
-				codeobj,
-				instaddr=codeaddr,
-				removelen=0,
-				addcodestr=_codeops_compile([
-					("LOAD_FAST", varnameidx),
-					("PRINT_ITEM", None),
-					("PRINT_NEWLINE", None),
-				]))
-			codeaddrdiff += 5
-			codeaddr += 5
-			# debug end
-
 			forIterAddr = codeaddr
 			forIterAbsJumpTarget = codeaddr + 3 + arg
 

@@ -194,10 +194,35 @@ def demo3():
 	new_func()
 
 
+def test_simplify_loop():
+	def func():
+		print "foo"
+		for i in range(2):
+			print i, "bar"
+		print "baz"
+	def func_simplified():
+		print "foo"
+		__loopiter_1 = iter(range(2))
+		while True:
+			try:
+				i = next(__loopiter_1)
+			except StopIteration:
+				break
+			print i, "bar"
+		print "baz"
+	print "normal:"
+	dis.dis(func)
+	print "simplified:"
+	dis.dis(func_simplified)
+	print "auto simplified:"
+	dis.dis(simplify_loops(func))
+
+
 def demo4():
 	def func():
 		bug = True
-		for i in range(2):
+		while True:
+			__loopiter_1
 			print i
 			if bug: raise Exception
 
@@ -207,7 +232,7 @@ def demo4():
 	func = simplify_loops(func)
 	dis.dis(func)
 
-	return
+	return func
 
 	try:
 		func()

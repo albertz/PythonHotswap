@@ -2,7 +2,7 @@
 # All rights reserved.
 # Code under 2-clause BSD licence.
 
-# Demo for `restart_func`.
+# Demo for `restart_func` and `simplify_loops`.
 
 import sys
 import dis
@@ -39,6 +39,8 @@ def demo2():
 	import imp
 	tmpfnmod = imp.load_source("tmpfnmod", tmpfn)
 	func = tmpfnmod.main
+	# Simplify away `for`-loops. See also `demo4`.
+	func = simplify_loops(func)
 	try:
 		func()
 		assert False, "You must raise an exception for this demo."

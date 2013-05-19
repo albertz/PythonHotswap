@@ -184,6 +184,7 @@ def replace_code(codeobj, instaddr, removelen=0, addcodestr=""):
 			chr(codelendiff & 255) + chr(0) + \
 			lnotab[lnotab_idx:]
 		codelendiff -= codelendiff & 255
+		lnotab_idx += 2
 	assert codelendiff == 0
 	del codelendiff
 

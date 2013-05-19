@@ -374,7 +374,7 @@ def simplify_loops(func):
 
 	codeobj = func.func_code
 
-	names = func.func_code.co_names
+	names = codeobj.co_names
 	names, names_next_idx = _list_getobjoradd(names, "next")
 	names, names_StopIter_idx = _list_getobjoradd(names, "StopIteration")
 	codeobj = _modified_code(
@@ -382,7 +382,8 @@ def simplify_loops(func):
 		names=names,
 	)
 
-	varnames = func.func_code.co_varnames
+	varnames = codeobj.co_varnames
+	nlocals = codeobj.co_nlocals
 	varidx = _get_varnameprefix_startidx(varnames, "__loopiter")
 
 	oplist = list(_opiter(codeobj.co_code))
@@ -396,9 +397,11 @@ def simplify_loops(func):
 			varnameidx = len(varnames)
 			varnames += ("__loopiter_%i" % varidx,)
 			varidx += 1
+			nlocals += 1
 			codeobj = _modified_code(
 				codeobj,
 				varnames=varnames,
+				nlocals=nlocals
 			)
 
 			# We expect that the loop jumps back to the FOR_ITER and thus expects

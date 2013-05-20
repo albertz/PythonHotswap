@@ -14,9 +14,9 @@ You want to edit the code, maybe modify some local variables and just resume the
 
 Solves this problem! :)
 
-Take a look at `demo2()` in [main.py](https://github.com/albertz/PythonHotswap/blob/master/main.py). It lets the user edit some simple function, then runs it and waits for an exception. Or just press Ctrl+C to break it. Then it lets the user edit the function again with a hint where the exception occured. After the edit, it resumes the execution at the place where the exception occured. Via the `diff` tool, it determines the new line number.
+Take a look at [`demo2()`](https://github.com/albertz/PythonHotswap/blob/master/demo2.py). It lets the user edit some simple function, then runs it and waits for an exception. Or just press Ctrl+C to break it. Then it lets the user edit the function again with a hint where the exception occured. After the edit, it resumes the execution at the place where the exception occured. Via the `diff` tool, it determines the new line number.
 
-Start it via `python main.py demo2` to play around with it.
+Start it via `python demo2.py` to play around with it.
 
 ## How to solve that.
 
